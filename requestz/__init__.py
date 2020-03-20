@@ -7,10 +7,12 @@ from urllib.parse import quote, urlencode, urlparse, urlunparse
 import pycurl
 import yaml
 
+DEFAULT_REDIRECT_LIMIT = 30
 
 class Response(object):
     def __init__(self):
         pass
+        self.stats = dict()
 
     def json(self):
         try:
@@ -23,6 +25,17 @@ class Response(object):
 class Session(object):
     def __init__(self):
         self.c = pycurl.Curl()  # todo session默认配置
+        self.auth = None
+        self.cert = None
+        self.cookies = None
+        self.headers = {}
+        self.hooks = None
+        self.max_resirects = DEFAULT_REDIRECT_LIMIT
+        self.params = {}
+        self.proxies = {}
+        self.trust_env = True
+        self.verify = True
+        self.base_url = None
 
     def _handle_method(self, method: str):
         if not isinstance(method, str):
@@ -39,6 +52,7 @@ class Session(object):
             raise TypeError(f'params: {params} 只支持dict,list,tuple格式')
         if isinstance(params, dict):
             params = params.items()
+
 
         params_list = ['='.join(item) for item in params]  # todo
         query = '&'.join(params_list)
@@ -63,7 +77,7 @@ class Session(object):
         url = urlunparse(result)
         return url
 
-    def _handle_url(self, url: str, params):   # todo url encode
+    def _handle_url(self, url, params):   # todo url encode
         if not isinstance(url, str):
             raise TypeError(f'url: {url} 应为字符串')
         url = self._handle_query(url, params)
@@ -122,18 +136,29 @@ class Session(object):
         res.text = content.decode('utf-8')  # todo
 
         res.elispse = self.c.getinfo(pycurl.TOTAL_TIME)
-        res.namelookup_time = self.c.getinfo(pycurl.NAMELOOKUP_TIME)
-        res.connect_time = self.c.getinfo(pycurl.CONNECT_TIME)
-        res.pretransfer_time = self.c.getinfo(pycurl.PRETRANSFER_TIME)
-        res.starttransfer_time = self.c.getinfo(pycurl.STARTTRANSFER_TIME)
-        res.redirect_time = self.c.getinfo(pycurl.REDIRECT_TIME)
 
+        res.stats['total_time'] = self.c.getinfo(pycurl.TOTAL_TIME)
+        res.stats['namelookup_time'] = self.c.getinfo(pycurl.NAMELOOKUP_TIME)
+        res.stats['connect_time'] = self.c.getinfo(pycurl.CONNECT_TIME)
+        res.stats['pretransfer_time'] = self.c.getinfo(pycurl.PRETRANSFER_TIME)
+        res.stats['starttransfer_time'] = self.c.getinfo(pycurl.STARTTRANSFER_TIME)
+        res.stats['redirect_time'] = self.c.getinfo(pycurl.REDIRECT_TIME)
+
+        res.stats['ssl_time'] = self.c.getinfo(pycurl.APPCONNECT_TIME)  # 握手时间
+        res.stats['num_connects'] = self.c.getinfo(pycurl.NUM_CONNECTS)
+        res.stats['redirect_count'] = self.c.getinfo(pycurl.REDIRECT_COUNT)
+        res.stats['size_upload'] = self.c.getinfo(pycurl.SIZE_UPLOAD)
+        res.stats['size_download'] = self.c.getinfo(pycurl.SIZE_DOWNLOAD)
+        # res.stats['content_length_upload'] = self.c.getinfo(pycurl.CONTENT_LENGTH_UPLOAD)
+        # res.stats['content_length_download'] = self.c.getinfo(pycurl.CONTENT_LENGTH_DOWNLOAD)
+        res.stats['speed_upload'] = self.c.getinfo(pycurl.SPEED_UPLOAD)
+        res.stats['nspeed_download'] = self.c.getinfo(pycurl.SPEED_DOWNLOAD)
         # self.c.close()
         return res
 
     def request(self, method, url, params=None, headers=None, cookies=None,
                 data=None, json=None, files=None, timeout=None, verify_ssl=False):
-
+        self.c = pycurl.Curl()
         self._handle_method(method)
         self._handle_url(url, params)
         if headers:
@@ -146,6 +171,26 @@ class Session(object):
         res = self.send()
         return res
 
+    def get(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('GET', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def post(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('POST', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def head(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('HEAD', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def options(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('OPTIONS', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def put(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('PUT', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def patch(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('PATCH', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
+
+    def delete(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify_ssl=False):
+        return self.request('DELETE', url, params, headers, cookies, data, json, files, timeout, verify_ssl)
 
 class Runner(object):
     def __init__(self):
