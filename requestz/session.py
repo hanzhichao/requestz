@@ -1,5 +1,6 @@
 import logging
 import io
+import os
 from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
 from typing import Mapping
 
@@ -104,6 +105,36 @@ class Session(object):
             logging.exception(ex)
             raise ValueError(f'body: {body} 不合法')
 
+    def _set_files(self, files):
+        if not files:
+            return
+        if not isinstance(files, dict):
+            raise TypeError(f'files: {files} 必须为字典格式')
+        logging.debug(f'设置files: {files}')
+        files_data = []
+        for key, value in files.items():
+            if not isinstance(value, (str, tuple, list)):
+                raise TypeError(f'value: {value} 只支持str, tuple, list格式')
+            if isinstance(value, str):
+                values = [value]
+            else:
+                values = value
+            if len(values) > 1:
+                file_path = values[0]
+                if not os.path.exists(file_path):
+                    raise ValueError(f'文件路径: {value}不存在')
+            title = (pycurl.FORM_FILE, pycurl.FORM_FILENAME, pycurl.FORM_CONTENTTYPE)
+
+            files_data.append((key, tuple(zip(title, values))[0]))
+        print(files_data)
+        try:
+            self.curl.setopt(pycurl.HTTPPOST, files_data)
+        except Exception as ex:
+            logging.exception(ex)
+            raise ex
+            # raise ValueError(f'value: {value} 不合法')
+
+
     def _set_timeout(self, timeout):
         if not isinstance(timeout, (int, float, tuple, list)):
             raise TypeError(f'timeout: {timeout} 只支持int,float, tuple, list格式')
@@ -147,6 +178,8 @@ class Session(object):
         self._set_headers(request.headers)
 
         self._set_body(request.body)
+        self._set_files(request.files)
+
         self._set_timeout(timeout)
         self._set_verify(verify)
         self._set_allow_redirects(allow_redirects)

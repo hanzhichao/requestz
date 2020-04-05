@@ -1,4 +1,5 @@
 import logging
+import os
 import json as pyjson
 import io
 from typing import Mapping
@@ -12,7 +13,9 @@ class Request(object):
         self.method = None
         self.url = None
         self.headers = {}
+        self.files = None
         self.body = None
+
 
     def prepare(self, method=None, url=None, headers=None,cookies=None, params=None, data=None,json=None,files=None,
                 auth=None, hooks=None):
@@ -81,9 +84,8 @@ class Request(object):
 
     def prepare_body(self, data, files, json=None):
         body = None
-        if files is not None:
-            raise NotImplementedError
-        elif data is not None:
+
+        if data is not None:
             if not isinstance(data, (Mapping, str, io.TextIOWrapper)):
                 raise TypeError(f'data: {data} 只支持dict, str, io.TextIOWrapper格式')
 
@@ -93,6 +95,10 @@ class Request(object):
                 print(body)
             else:
                 body = data
+        elif files is not None:
+            self.headers.update({'Content-Type': 'multipart/form-data'})
+            self.files = files
+
         elif json is not None:
             self.headers.update({'Content-Type': 'application/json'})
             body = pyjson.dumps(json, ensure_ascii=True).encode('ascii')

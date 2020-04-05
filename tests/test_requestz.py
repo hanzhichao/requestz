@@ -154,6 +154,10 @@ def test_response_verify_by_schema():
     assert res.check(schema2) is False
 
 
+def test_request_with_files():
+    res = s.post(HTTPBIN_BASE_URL + '/post', files={'file1': 'demo_apis.yaml', 'file2': '300.jpg'})
+    print(res.text)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, '-qs'])
