@@ -4,7 +4,7 @@ import logging
 
 import chardet
 
-from requestz.utils import parse_cookies, check_type, find_by_re, find_by_jsonpath, find_by_xpath
+from requestz.utils import parse_cookies, check_type, find_by_re, find_by_jsonpath, find_by_xpath, verify_by_schema
 
 
 class Response(object):
@@ -89,5 +89,17 @@ class Response(object):
         if one and isinstance(results, list) and len(results) > 0:
             return results[0]
         return results
+
+    @check_type(args=(object, dict,))
+    def check(self, schema, expr=None):
+        field = self.find(expr) or {} if expr else self.json()
+        try:
+            verify_by_schema(field, schema)
+            return True
+        except Exception as ex:
+            logging.exception(ex)
+            return False
+
+
 
 

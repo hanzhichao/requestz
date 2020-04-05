@@ -49,8 +49,7 @@ def verify_by_expr(self, operator, expr, expect_value):  # expr: content.url
 
 
 def verify_by_schema(field, schema):
-    if field is None:
-        return validate(field, schema=schema)
+    return validate(field, schema=schema)
 
 
 def double_split(line, sep1, sep2):
