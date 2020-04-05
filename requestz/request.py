@@ -86,8 +86,8 @@ class Request(object):
         body = None
 
         if data is not None:
-            if not isinstance(data, (Mapping, str, io.TextIOWrapper)):
-                raise TypeError(f'data: {data} 只支持dict, str, io.TextIOWrapper格式')
+            if not isinstance(data, (Mapping, str, io.TextIOWrapper, io.BufferedReader)):
+                raise TypeError(f'data: {data} 只支持dict, str, io.TextIOWrapper, io.BufferedReader格式')
 
             if isinstance(data, (Mapping, list, tuple)):
                 self.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})

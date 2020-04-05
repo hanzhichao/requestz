@@ -94,11 +94,23 @@ class Session(object):
             logging.exception(ex)
             raise ValueError(f'headers: {headers} 不合法')
 
+    def _set_upload(self, body):
+        if not isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
+            raise TypeError(f'上传body: {type(body)} 只支持io.TextIOWrapper, io.BufferedReader')
+        try:
+            self.curl.setopt(pycurl.UPLOAD, 1)
+            self.curl.setopt(pycurl.READDATA, body)
+        except Exception as ex:
+            logging.exception(ex)
+            raise ValueError(f'上传body: {body} 不合法')
 
     def _set_body(self, body):
         if not body:
             return
         logging.debug(f'设置body: {body}')
+        if isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
+            return self._set_upload(body)
+
         try:
             self.curl.setopt(pycurl.POSTFIELDS, body)
         except Exception as ex:
