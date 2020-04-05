@@ -1,11 +1,15 @@
 import sys; sys.path.append('/Users/apple/Documents/Projects/Self/requestz')
 import pytest
-from requestz import Session, Runner
+from requestz.runner import Session, Runner
 import json
 
 
 s = Session()
 
+
+def test_baidu():
+    res = s.request('get', 'https://www.baidu.com')
+    assert res.status_code == 200
 
 def test_get():
     res = s.request('get', 'https://httpbin.org/get')
@@ -25,7 +29,7 @@ def test_get_with_query():
         assert form == {'a': '1', 'b': '2'}
 
 
-def test_get_with_query():
+def test_get_with_query2():
     res = s.request('get', 'https://httpbin.org/get?a=1&name=张三')
     assert res.status_code == 200
     print(res.text)
