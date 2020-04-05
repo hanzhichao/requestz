@@ -121,6 +121,16 @@ def test_session_keep_cookies():
     print(res.text)
 
 
+def test_response_find_by_jsonpath_re():
+    res = s.get(HTTPBIN_BASE_URL + '/get', headers={'x-text2': 'abc'})
+    print(res.text)
+    assert res.find('$.headers.X-Text2') == 'abc'
+    assert res.find('"Connection": "(.*)"') == 'keep-alive'
+
+
+def test_response_find_by_xpath():
+    res = s.get('https://www.baidu.com/')
+    assert res.find('//title/text()') == '百度一下，你就知道'
 
 if __name__ == "__main__":
     pytest.main([__file__, '-qs'])

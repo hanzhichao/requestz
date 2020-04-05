@@ -1,7 +1,8 @@
 import re
+import logging
 from typing import Mapping
+from functools import wraps
 
-import chardet
 from jsonpath import jsonpath
 from jsonschema import validate
 from lxml import etree
@@ -35,7 +36,7 @@ def find_by_jsonpath(field, expr):
 
 
 def find_by_re(text, expr):
-    return re.findall(expr, text)
+    return re.findall(expr, text, re.MULTILINE)
 
 
 def find_by_xpath(text, expr):  # html
@@ -82,3 +83,29 @@ def parse_cookies(line):
 
 def pack_cookies(cookies):
     return double_pack(cookies, '; ', '=')
+
+
+def check_type(*self, args=None, kwargs=None):
+    def _check_type(func):
+        @wraps(func)
+        def inner(*func_args, **func_kwargs):
+            if args:
+                for index, _type in enumerate(args):
+                    try:
+                        func_arg = func_args[index]
+                    except Exception as ex:
+                        logging.exception(ex)
+                        continue
+
+                    if not isinstance(func_arg, _type):
+                        raise TypeError(f"函数: {func.__name__} 参数:{func_arg} 必须为 {_type} 类型")
+            if kwargs:
+                for kwarg, _type in kwargs.items():
+                    func_kwarg = func_kwargs.get(kwarg, 'NOTHISKEY')
+                    if func_kwargs == 'NOTHISKEY':
+                        continue
+                    if not isinstance(locals().get(func_kwarg), _type):
+                        raise TypeError(f"函数: {func.__name__} 参数:{func_kwarg} 必须为 {_type} 类型")
+            return func(*func_args, **func_kwargs)
+        return inner
+    return _check_type

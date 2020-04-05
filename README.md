@@ -7,7 +7,7 @@
 
 - [x] session默认值
 - [ ] files
-- [ ] cookies
+- [x] cookies
 - [ ] hooks on error
 - [ ] dubbo
 - [ ] soup

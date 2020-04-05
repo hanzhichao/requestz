@@ -1,11 +1,10 @@
 import json
-from collections import defaultdict
 import gzip
 import logging
 
 import chardet
 
-from requestz.utils import double_split, parse_cookies
+from requestz.utils import parse_cookies, check_type, find_by_re, find_by_jsonpath, find_by_xpath
 
 
 class Response(object):
@@ -77,3 +76,18 @@ class Response(object):
         except json.decoder.JSONDecodeError:
             logging.error(f'响应非JSON格式: {self.text}')
             return {}
+
+    @check_type(args=(object, str,))
+    def find(self, expr, by=None, one=True):
+        if by == 'xpath' or expr.startswith('/'):
+            results = find_by_xpath(self.text, expr)
+        elif by == 'jsonpath' or expr.startswith('$.'):
+            results = find_by_jsonpath(self.json(), expr)
+        else:
+            results = find_by_re(self.text, expr)
+
+        if one and isinstance(results, list) and len(results) > 0:
+            return results[0]
+        return results
+
+

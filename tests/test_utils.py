@@ -1,4 +1,7 @@
-from requestz.utils import double_split, parse_cookies
+
+import pytest
+
+from requestz.utils import double_split, parse_cookies, check_type
 
 
 def test_double_split():
@@ -11,3 +14,12 @@ def test_parse_cookies():
     line = 'BAIDUID=7F9E96B69ECAA4758C3981749DDCFBC2:FG=1; expires=Thu, 31-Dec-37 23:55:55 GMT; max-age=2147483647; path=/; domain=.baidu.com'
     result = parse_cookies(line)
     print(result)
+
+
+def test_check_type():
+    @check_type(a=int)
+    def func(a):
+        print(a)
+
+    with pytest.raises(TypeError):
+        func('1')
