@@ -13,7 +13,7 @@
 ## todo
 
 - [x] session默认值
-- [ ] files
+- [x] files
 - [x] cookies
 - [ ] hooks on error
 - [ ] dubbo
