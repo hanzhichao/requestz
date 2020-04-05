@@ -72,9 +72,11 @@ class Session(object):
 
     def _set_user_agent(self, user_agent):
         try:
-            self.curl.setopt(pycurl.USERAGENT, value)
+            self.curl.setopt(pycurl.USERAGENT, user_agent)
         except:
             raise ValueError('设置useragent: {value}失败')
+
+
     def _set_headers(self, headers):
         if not headers:
             return
@@ -133,26 +135,31 @@ class Session(object):
             except Exception as ex:
                 print(f'设置verify {verify}失败')
 
+
     def send(self, request, timeout=None, verify=None, allow_redirects=None):
-        """负责设置pycurl斌发送请求,及组装响应"""
+        """负责设置pycurl并发送请求,及组装响应"""
         response = Response()
         response.request = request
+        response.url = request.url
 
         self._set_method(request.method)
         self._set_url(request.url)
         self._set_headers(request.headers)
-        print(request.headers)
+
         self._set_body(request.body)
         self._set_timeout(timeout)
         self._set_verify(verify)
         self._set_allow_redirects(allow_redirects)
 
-        content = self.curl.perform_rb()
+        self.curl.setopt(pycurl.HEADERFUNCTION, response.handle_header_line)
+
+        # 发送请求
+        response.raw = self.curl.perform_rb()
+        # 更新会话cookies
+        self.cookies.update(response.cookies)
 
         response.status_code = self.curl.getinfo(pycurl.HTTP_CODE)
-
-        response.content = content
-        response.elispse = self.curl.getinfo(pycurl.TOTAL_TIME)
+        response.elapsed = self.curl.getinfo(pycurl.TOTAL_TIME)
 
         response.stats['total_time'] = self.curl.getinfo(pycurl.TOTAL_TIME)
         response.stats['namelookup_time'] = self.curl.getinfo(pycurl.NAMELOOKUP_TIME)
@@ -170,6 +177,7 @@ class Session(object):
         response.stats['content_length_download'] = self.curl.getinfo(pycurl.CONTENT_LENGTH_DOWNLOAD)
         response.stats['speed_upload'] = self.curl.getinfo(pycurl.SPEED_UPLOAD)
         response.stats['speed_download'] = self.curl.getinfo(pycurl.SPEED_DOWNLOAD)
+
 
         return response
 

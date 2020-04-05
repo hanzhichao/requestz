@@ -4,24 +4,23 @@ import io
 from typing import Mapping
 from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
 
+from requestz.utils import pack_cookies
 
 class Request(object):
     """处理请求参数"""
     def __init__(self):
         self.method = None
         self.url = None
-        self.headers = None
+        self.headers = {}
         self.body = None
-        self.hooks = None
 
     def prepare(self, method=None, url=None, headers=None,cookies=None, params=None, data=None,json=None,files=None,
                 auth=None, hooks=None):
 
         self.prepare_url(url, params)
-        self.prepare_headers(headers)
-        self.prepare_cookies(cookies)
         self.prepare_body(data, files, json)
-        self.prepare_method(method)
+        self.prepare_headers(headers, cookies)  # 需要在prepare_body后面
+        self.prepare_method(method)  # 需要在prepare_body后面
         return self
 
     def prepare_method(self, method):
@@ -56,19 +55,29 @@ class Request(object):
             result[4] = '&'.join(params)
             self.url = urlunparse(result)
 
-    def prepare_headers(self, headers):
-        print(headers)
-        if not headers:
+    def prepare_headers(self, headers, cookies):
+        if not headers and not cookies:
             return
+
         if not isinstance(headers, (dict, list, tuple)):
             raise TypeError(f'headers: {headers} 只支持dict,list,tuple格式')
-        if isinstance(headers, dict):
+
+        # 处理cookies
+        if cookies:
+            if not isinstance(cookies, (dict, list, tuple)):
+                raise TypeError(f'cookies: {cookies} 只支持dict,list,tuple格式')
+            if isinstance(cookies, Mapping):
+                cookies = cookies.items()
+            cookies = pack_cookies(cookies)
+            print('cookies', cookies)
+            headers['Cookie'] = cookies  # FIXME 只支持headers为字典格式
+
+        if isinstance(headers, Mapping):
+
             headers = headers.items()
 
         self.headers = [': '.join(item) for item in headers]  # todo
 
-    def prepare_cookies(self, cookies):
-        pass
 
     def prepare_body(self, data, files, json=None):
         body = None
@@ -81,6 +90,7 @@ class Request(object):
             if isinstance(data, (Mapping, list, tuple)):
                 self.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})
                 body = urlencode(data)
+                print(body)
             else:
                 body = data
         elif json is not None:
