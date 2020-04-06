@@ -3,9 +3,10 @@ import gzip
 import logging
 
 import chardet
+from logz import log as logging
 
-from requestz.utils import parse_cookies, check_type, find_by_re, find_by_jsonpath, find_by_xpath, verify_by_schema
-
+from requestz.utils import parse_cookies, params_check, find_by_re, find_by_jsonpath, find_by_xpath, verify_by_schema, type_check
+from requestz.structure import CaseInsensitiveDict
 
 class Response(object):
     def __init__(self):
@@ -15,12 +16,15 @@ class Response(object):
         self.status_code = None
         self.reason = None
         self.encoding = 'utf-8'
-        self.headers = {}
+        self.headers = CaseInsensitiveDict()
         self.cookies = {}
         self.elapsed = None
         self.raw = None
 
         self.stats = {}
+
+    def __repr__(self):
+        return f'<Response {self.status_code}: {self.url}>'
 
     def handle_header_line(self, line: bytes):
         """处理pycurl每一行的响应头"""
@@ -77,7 +81,7 @@ class Response(object):
             logging.error(f'响应非JSON格式: {self.text}')
             return {}
 
-    @check_type(args=(object, str,))
+    @params_check(args=(object, str,))
     def find(self, expr, by=None, one=True):
         if by == 'xpath' or expr.startswith('/'):
             results = find_by_xpath(self.text, expr)
@@ -90,7 +94,7 @@ class Response(object):
             return results[0]
         return results
 
-    @check_type(args=(object, dict,))
+    @params_check(args=(object, dict,))
     def check(self, schema, expr=None):
         field = self.find(expr) or {} if expr else self.json()
         try:

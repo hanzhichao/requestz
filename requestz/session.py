@@ -6,14 +6,16 @@ from typing import Mapping
 
 import pycurl
 import certifi
+from logz import log as logging
 
 from requestz.response import Response
 from requestz.request import Request
-from requestz.utils import merge_dict
+from requestz.utils import merge_dict, type_check
 
 DEFAULT_REDIRECT_LIMIT = 30
 DEFAULT_TIMEOUT = 60
-
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) " \
+                     "Chrome/73.0.3683.103 Safari/537.36"
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) "
                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
@@ -21,6 +23,9 @@ DEFAULT_HEADERS = {
     'Accept': '*/*',
     'Connection': 'keep-alive',
 }
+
+REQUEST_KWARGS = dict(params=None, headers=None, cookies=None, data=None, json=None, files=None,timeout=None,
+                      verify=None, allow_redirects=None, proxies=None, hooks=None, stream=None, cert=None)
 
 
 class Session(object):
@@ -77,7 +82,6 @@ class Session(object):
         except:
             raise ValueError('设置useragent: {value}失败')
 
-
     def _set_headers(self, headers):
         if not headers:
             return
@@ -95,8 +99,9 @@ class Session(object):
             raise ValueError(f'headers: {headers} 不合法')
 
     def _set_upload(self, body):
-        if not isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
-            raise TypeError(f'上传body: {type(body)} 只支持io.TextIOWrapper, io.BufferedReader')
+        type_check(body, (io.TextIOWrapper, io.BufferedReader))
+        # if not isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
+        #     raise TypeError(f'上传body: {type(body)} 只支持io.TextIOWrapper, io.BufferedReader')
         try:
             self.curl.setopt(pycurl.UPLOAD, 1)
             self.curl.setopt(pycurl.READDATA, body)
@@ -120,13 +125,15 @@ class Session(object):
     def _set_files(self, files):
         if not files:
             return
-        if not isinstance(files, dict):
-            raise TypeError(f'files: {files} 必须为字典格式')
+        type_check(files, dict)
+        # if not isinstance(files, dict):
+        #     raise TypeError(f'files: {files} 必须为字典格式')
         logging.debug(f'设置files: {files}')
         files_data = []
         for key, value in files.items():
-            if not isinstance(value, (str, tuple, list)):
-                raise TypeError(f'value: {value} 只支持str, tuple, list格式')
+            type_check(value, (str, tuple, list))
+            # if not isinstance(value, (str, tuple, list)):
+            #     raise TypeError(f'value: {value} 只支持str, tuple, list格式')
             if isinstance(value, str):
                 values = [value]
             else:
@@ -146,18 +153,20 @@ class Session(object):
             raise ex
             # raise ValueError(f'value: {value} 不合法')
 
-
     def _set_timeout(self, timeout):
-        if not isinstance(timeout, (int, float, tuple, list)):
-            raise TypeError(f'timeout: {timeout} 只支持int,float, tuple, list格式')
+        type_check(timeout, (int, float, tuple, list))
+        # if not isinstance(timeout, (int, float, tuple, list)):
+        #     raise TypeError(f'timeout: {timeout} 只支持int,float, tuple, list格式')
         if isinstance(timeout, (int, float)):
             self.curl.setopt(pycurl.TIMEOUT, timeout)
         if isinstance(timeout, (tuple, list)):
             if len(timeout) < 2:
                 raise ValueError(f'timeout: {timeout} 应至少包含两个元素')
             connection_timeout, download_timeout,*_ = timeout
-            if not all((isinstance(connection_timeout, (int, float)), isinstance(download_timeout, (int, float)))):
-                raise TypeError(f'timeout: {timeout} 中前两个元素应为数字类型')
+            type_check(connection_timeout, (int, float))
+            type_check(download_timeout, (int, float))
+            # if not all((isinstance(connection_timeout, (int, float)), isinstance(download_timeout, (int, float)))):
+            #     raise TypeError(f'timeout: {timeout} 中前两个元素应为数字类型')
             self.curl.setopt(pycurl.CONNECTTIMEOUT, connection_timeout)
             self.curl.setopt(pycurl.TIMEOUT, download_timeout)  # todo
 
@@ -178,31 +187,7 @@ class Session(object):
             except Exception as ex:
                 print(f'设置verify {verify}失败')
 
-
-    def send(self, request, timeout=None, verify=None, allow_redirects=None):
-        """负责设置pycurl并发送请求,及组装响应"""
-        response = Response()
-        response.request = request
-        response.url = request.url
-
-        self._set_method(request.method)
-        self._set_url(request.url)
-        self._set_headers(request.headers)
-
-        self._set_body(request.body)
-        self._set_files(request.files)
-
-        self._set_timeout(timeout)
-        self._set_verify(verify)
-        self._set_allow_redirects(allow_redirects)
-
-        self.curl.setopt(pycurl.HEADERFUNCTION, response.handle_header_line)
-
-        # 发送请求
-        response.raw = self.curl.perform_rb()
-        # 更新会话cookies
-        self.cookies.update(response.cookies)
-
+    def _set_response(self, response):
         response.status_code = self.curl.getinfo(pycurl.HTTP_CODE)
         response.elapsed = self.curl.getinfo(pycurl.TOTAL_TIME)
 
@@ -223,10 +208,39 @@ class Session(object):
         response.stats['speed_upload'] = self.curl.getinfo(pycurl.SPEED_UPLOAD)
         response.stats['speed_download'] = self.curl.getinfo(pycurl.SPEED_DOWNLOAD)
 
+    def send(self, request, timeout=None, verify=None, allow_redirects=None):
+        """负责设置pycurl并发送请求,及组装响应"""
+        response = Response()
+        response.request = request
+        response.url = request.url
 
+        self._set_method(request.method)
+        self._set_url(request.url)
+
+        self._set_user_agent(DEFAULT_USER_AGENT) # 设置默认User-Agent
+        self._set_headers(request.headers)
+
+        self._set_body(request.body)
+        self._set_files(request.files)
+
+        self._set_timeout(timeout)
+        self._set_verify(verify)
+        self._set_allow_redirects(allow_redirects)
+
+        self.curl.setopt(pycurl.HEADERFUNCTION, response.handle_header_line)
+
+        # 发送请求
+        response.raw = self.curl.perform_rb()
+        self._set_response(response)
+        # 更新会话cookies
+        self.cookies.update(response.cookies)
         return response
 
-    def request(self, method, url, params=None, headers=None, cookies=None, data=None, json=None, files=None,
+    def super_send(self, requests, config=None, times=None, concurreny=None, is_async=False, loop_until=None):
+        pass
+
+
+    def request(self, method=None, url=None, params=None, headers=None, cookies=None, data=None, json=None, files=None,
                 timeout=None, verify=None, allow_redirects=None, proxies=None, hooks=None, stream=None, cert=None):
         """负责整合session和参数中的设置"""
         if self.base_url and not url.startswith('http'):
@@ -245,6 +259,7 @@ class Session(object):
         res = self.send(request, timeout, verify, allow_redirects)
         return res
 
+    # todo 简化
     def get(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
         return self.request('GET', url, params, headers, cookies, data, json, files, timeout, verify)
 

@@ -23,6 +23,7 @@ def test_baidu():
     # print(res.text)
     # print(res.json())
 
+
 def test_get():
     res = s.request('get', HTTPBIN_BASE_URL + '/get')
     assert res.status_code == 200
@@ -78,13 +79,6 @@ def test_post_json():
     else:
         form = res_dict.get('json')
         assert form == data
-
-
-def test_runner():
-    with open('/Users/apple/Documents/Projects/Self/requestz/tests/demo_apis.yaml', encoding='utf-8') as f:
-        data = f.read().strip()
-    runner = Runner()
-    runner.run_yaml(data)
 
 
 def test_response_headers_with_requests():

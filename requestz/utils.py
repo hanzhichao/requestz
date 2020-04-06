@@ -84,7 +84,8 @@ def pack_cookies(cookies):
     return double_pack(cookies, '; ', '=')
 
 
-def check_type(*self, args=None, kwargs=None):
+# 装饰器
+def params_check(*self, args=None, kwargs=None):
     def _check_type(func):
         @wraps(func)
         def inner(*func_args, **func_kwargs):
@@ -108,3 +109,8 @@ def check_type(*self, args=None, kwargs=None):
             return func(*func_args, **func_kwargs)
         return inner
     return _check_type
+
+
+def type_check(value, types):
+    if not isinstance(value, types):
+        raise TypeError(f'value: {value} must be in type {types}')

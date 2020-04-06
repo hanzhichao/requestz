@@ -1,7 +1,7 @@
 
 import pytest
 
-from requestz.utils import double_split, parse_cookies, check_type
+from requestz.utils import double_split, parse_cookies, params_check
 
 
 def test_double_split():
@@ -17,7 +17,7 @@ def test_parse_cookies():
 
 
 def test_check_type():
-    @check_type(a=int)
+    @params_check(a=int)
     def func(a):
         print(a)
 

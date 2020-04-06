@@ -5,7 +5,9 @@ import io
 from typing import Mapping
 from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
 
-from requestz.utils import pack_cookies
+from logz import log as logging
+
+from requestz.utils import pack_cookies, type_check
 
 class Request(object):
     """处理请求参数"""
@@ -31,16 +33,18 @@ class Request(object):
 
     def prepare_url(self, url, params):
         # 处理url
-        if not isinstance(url, str):
-            raise TypeError(f'url: {url} 应为字符串')
+        type_check(url, str)
+        # if not isinstance(url, str):
+        #     raise TypeError(f'url: {url} 应为字符串')
 
         result = urlparse(url=url, allow_fragments=True)
         query = result.query
 
         # 处理params
         if params:
-            if not isinstance(params, (dict, list, tuple)):
-                raise TypeError(f'params: {params} 只支持dict,list,tuple格式')
+            type_check(params, (dict, list, tuple))
+            # if not isinstance(params, (dict, list, tuple)):
+            #     raise TypeError(f'params: {params} 只支持dict,list,tuple格式')
             if isinstance(params, dict):
                 params = params.items()
             params_list = ['='.join(item) for item in params]  # todo
@@ -61,14 +65,15 @@ class Request(object):
     def prepare_headers(self, headers, cookies):
         if not headers and not cookies:
             return
-
-        if not isinstance(headers, (dict, list, tuple)):
-            raise TypeError(f'headers: {headers} 只支持dict,list,tuple格式')
+        type_check(headers, (dict, list, tuple))
+        # if not isinstance(headers, (dict, list, tuple)):
+        #     raise TypeError(f'headers: {headers} 只支持dict,list,tuple格式')
 
         # 处理cookies
         if cookies:
-            if not isinstance(cookies, (dict, list, tuple)):
-                raise TypeError(f'cookies: {cookies} 只支持dict,list,tuple格式')
+            type_check(cookies, (dict, list, tuple))
+            # if not isinstance(cookies, (dict, list, tuple)):
+            #     raise TypeError(f'cookies: {cookies} 只支持dict,list,tuple格式')
             if isinstance(cookies, Mapping):
                 cookies = cookies.items()
             cookies = pack_cookies(cookies)
@@ -86,8 +91,9 @@ class Request(object):
         body = None
 
         if data is not None:
-            if not isinstance(data, (Mapping, str, io.TextIOWrapper, io.BufferedReader)):
-                raise TypeError(f'data: {data} 只支持dict, str, io.TextIOWrapper, io.BufferedReader格式')
+            type_check(data, (Mapping, str, io.TextIOWrapper, io.BufferedReader))
+            # if not isinstance(data, (Mapping, str, io.TextIOWrapper, io.BufferedReader)):
+            #     raise TypeError(f'data: {data} 只支持dict, str, io.TextIOWrapper, io.BufferedReader格式')
 
             if isinstance(data, (Mapping, list, tuple)):
                 self.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})

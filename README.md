@@ -25,3 +25,5 @@
 - [ ] 并行
 - [ ] 多轮
 - [x] runner
+- [x] type_check
+- [x] run_by_unittest

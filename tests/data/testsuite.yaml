@@ -1,0 +1,38 @@
+config:
+  name: '测试套件'
+  base_url: https://aip.baidubce.com
+  variables:
+    a: 1
+    b: 2
+  request:
+    headers:
+      x-test: x-test
+    timeout: 10
+
+tests:
+  - name: 测试百度OCR
+    steps:
+      - name: 获取百度token接口 # 接口名称
+        request:  # 请求报文
+          url: /oauth/2.0/token
+          method: get
+          params:
+            grant_type: client_credentials
+            client_id: kPoFYw85FXsnojsy5bB9hu6x
+            client_secret: l7SuGBkDQHkjiTPU3m6NaNddD6SCvDMC
+        extract:  # 提取变量, 字典格式
+          token:  response.json()['access_token']  # RESPONSE系统变量，代表响应对象
+
+      - name: 百度ORC接口  # 第二个接口
+        request:
+          url: https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${token}  # 使用变量
+          method: post
+          data:  # 请求体（表单格式）
+            url: https://upload-images.jianshu.io/upload_images/7575721-40c847532432e852.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240
+        check:  # 断言, 列表格式
+          - response.json()['words_result_num'] == 6
+  - name: 测试百度
+    steps:
+      - request:
+          url: https://www.baidu.com/
+          verify: True
