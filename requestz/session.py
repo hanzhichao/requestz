@@ -1,6 +1,11 @@
 import logging
 import io
 import os
+import datetime
+import socket
+import subprocess
+import platform
+import re
 from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
 from typing import Mapping
 
@@ -187,9 +192,31 @@ class Session(object):
             except Exception as ex:
                 print(f'设置verify {verify}失败')
 
+    def _get_clint_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        return ip
+
+    def _ping(self, domain):
+        param = '-n' if platform.system().lower() == 'windows' else '-c'
+        command = f'ping {param} 1 {domain}'
+        print(command)
+        p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+        out = p.stdout.read().decode('utf-8')
+        result, *_ = re.findall(r'time=(\d.*)\sms', out, re.M) or ['']
+        if result and result.isdigit():
+            return float(result)
+
     def _set_response(self, response):
         response.status_code = self.curl.getinfo(pycurl.HTTP_CODE)
-        response.elapsed = self.curl.getinfo(pycurl.TOTAL_TIME)
+        response.ok = 200 <= response.status_code < 400  # todo
+        # response.elapsed = self.curl.getinfo(pycurl.TOTAL_TIME)
+        response.client_ip = self._get_clint_ip()  # todo
+        response.elapsed = datetime.timedelta(seconds=self.curl.getinfo(pycurl.TOTAL_TIME))
 
         response.stats['total_time'] = self.curl.getinfo(pycurl.TOTAL_TIME)
         response.stats['namelookup_time'] = self.curl.getinfo(pycurl.NAMELOOKUP_TIME)

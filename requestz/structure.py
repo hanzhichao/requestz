@@ -1,11 +1,4 @@
-import http.client
 from collections import OrderedDict, defaultdict
-
-
-a = OrderedDict()
-a['a'] = 1
-a['a'] = 2
-print(a)
 
 
 class DotDict(dict):

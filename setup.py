@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""The setup script."""
 import os
 from setuptools import setup, find_packages
 
@@ -35,7 +32,7 @@ setup(
     packages=find_packages(include=['requestz']),
     setup_requires=setup_requirements,
     url='https://github.com/hanzhichao/requestz',
-    version='0.10',
+    version='0.12',
     zip_safe=True,
-    install_requires=['pycurl']
+    install_requires=['pycurl', 'jsonschema', 'jsonpath', 'lxml']
 )

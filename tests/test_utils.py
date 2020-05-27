@@ -1,4 +1,3 @@
-
 import pytest
 
 from requestz.utils import double_split, parse_cookies, params_check
