@@ -1,4 +1,3 @@
-import logging
 import io
 import os
 import datetime
@@ -59,7 +58,6 @@ class Session(object):
     def _set_method(self, method):
         if not method:
             return
-        logging.debug('设置method:', method)
         try:
             self.curl.setopt(pycurl.CUSTOMREQUEST, method)
         except Exception as ex:
@@ -69,7 +67,6 @@ class Session(object):
     def _set_url(self, url):
         if not url:
             return
-        logging.debug(f'设置url: {url}')
         try:
             if not url.startswith('http'):
                 if not self.base_url:
@@ -90,13 +87,13 @@ class Session(object):
     def _set_headers(self, headers):
         if not headers:
             return
-        logging.debug(f'设置headers: {headers}')
         if isinstance(headers, Mapping):
             for key, value in headers:
                 if key.lower() == 'user-agent':
                     self._set_user_agent(value)
                     break
             headers = headers.items()
+        headers = [f'{key}: {value}' for key, value in headers]
         try:
             self.curl.setopt(pycurl.HTTPHEADER, headers)
         except Exception as ex:
@@ -117,7 +114,6 @@ class Session(object):
     def _set_body(self, body):
         if not body:
             return
-        logging.debug(f'设置body: {body}')
         if isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
             return self._set_upload(body)
 
@@ -133,7 +129,6 @@ class Session(object):
         type_check(files, dict)
         # if not isinstance(files, dict):
         #     raise TypeError(f'files: {files} 必须为字典格式')
-        logging.debug(f'设置files: {files}')
         files_data = []
         for key, value in files.items():
             type_check(value, (str, tuple, list))
@@ -150,7 +145,6 @@ class Session(object):
             title = (pycurl.FORM_FILE, pycurl.FORM_FILENAME, pycurl.FORM_CONTENTTYPE)
 
             files_data.append((key, tuple(zip(title, values))[0]))
-        print(files_data)
         try:
             self.curl.setopt(pycurl.HTTPPOST, files_data)
         except Exception as ex:
@@ -183,14 +177,14 @@ class Session(object):
             self.curl.setopt(pycurl.FOLLOWLOCATION, True)
             self.curl.setopt(pycurl.MAXREDIRS, allow_redirects)
         except Exception as ex:
-            print(f'设置allow_redirects {allow_redirects}失败')
+            logging.error(f'设置allow_redirects {allow_redirects}失败')
 
     def _set_verify(self, verify):
         if verify:
             try:
                 self.curl.setopt(pycurl.CAINFO, certifi.where())
             except Exception as ex:
-                print(f'设置verify {verify}失败')
+                logging.error(f'设置verify {verify}失败')
 
     def _get_clint_ip(self):
         try:
