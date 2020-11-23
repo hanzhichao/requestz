@@ -88,7 +88,7 @@ class Session(object):
         if not headers:
             return
         if isinstance(headers, Mapping):
-            for key, value in headers:
+            for key, value in headers.items():
                 if key.lower() == 'user-agent':
                     self._set_user_agent(value)
                     break
