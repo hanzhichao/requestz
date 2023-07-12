@@ -1,21 +1,23 @@
-import io
-import os
 import datetime
-import socket
-import subprocess
+import io
+# from logz import log as logging
+import logging
+import os
 import platform
 import re
-from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
-from typing import Mapping
+import socket
+import subprocess
+from typing import Mapping, Optional, Union, Tuple, Dict
 
-import pycurl
 import certifi
-from logz import log as logging
+import pycurl
 
-from requestz.response import Response
+from requestz.auth import HTTPBasicAuth, HTTPDigestAuth, HTTPNTLMAuth, OAuth1
 from requestz.request import Request
+from requestz.response import Response
 from requestz.utils import merge_dict, type_check
 
+HTTP_VERSIONS = ('1.0', '1.1', '2.0')
 DEFAULT_REDIRECT_LIMIT = 30
 DEFAULT_TIMEOUT = 60
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) " \
@@ -28,7 +30,7 @@ DEFAULT_HEADERS = {
     'Connection': 'keep-alive',
 }
 
-REQUEST_KWARGS = dict(params=None, headers=None, cookies=None, data=None, json=None, files=None,timeout=None,
+REQUEST_KWARGS = dict(params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None,
                       verify=None, allow_redirects=None, proxies=None, hooks=None, stream=None, cert=None)
 
 
@@ -70,7 +72,7 @@ class Session(object):
         try:
             if not url.startswith('http'):
                 if not self.base_url:
-                    raise ValueError('url未已http开头,并且base_url未配置')
+                    raise ValueError('url未以http开头,并且base_url未配置')
                 else:
                     url = f'{self.base_url}/{url.lstrip("/")}'
             self.curl.setopt(pycurl.URL, url)
@@ -81,26 +83,51 @@ class Session(object):
     def _set_user_agent(self, user_agent):
         try:
             self.curl.setopt(pycurl.USERAGENT, user_agent)
-        except:
+        except Exception:
             raise ValueError('设置useragent: {value}失败')
 
-    def _set_headers(self, headers):
+    def _set_http_version(self, version: Optional[str]) -> None:
+        """
+        Set the HTTP version.
+        :param version: HTTP version must be one of ['1.0', '1.1', '2.0']
+        :return: None
+        """
+        if version:
+            assert version in HTTP_VERSIONS, f'HTTP版本只能为 {HTTP_VERSIONS} 其中之一'
+            if version == '2.0':
+                self.curl.setopt(pycurl.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2_0)
+            elif version == '1.0':
+                self.curl.setopt(pycurl.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_1_0)
+            else:
+                self.curl.setopt(pycurl.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_1_1)
+
+    def _set_headers(self, headers: Optional[Mapping]) -> None:
+        """
+        Set request headers
+        :param headers: request headers
+        :return: None
+        """
         if not headers:
             return
+        logging.debug(f'设置headers: {headers}')
         if isinstance(headers, Mapping):
-            for key, value in headers.items():
+            for key, value in headers:
                 if key.lower() == 'user-agent':
                     self._set_user_agent(value)
                     break
             headers = headers.items()
-        headers = [f'{key}: {value}' for key, value in headers]
         try:
             self.curl.setopt(pycurl.HTTPHEADER, headers)
         except Exception as ex:
             logging.exception(ex)
             raise ValueError(f'headers: {headers} 不合法')
 
-    def _set_upload(self, body):
+    def _set_upload(self, body) -> None:
+        """
+        Set upload file content
+        :param body:
+        :return: None
+        """
         type_check(body, (io.TextIOWrapper, io.BufferedReader))
         # if not isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
         #     raise TypeError(f'上传body: {type(body)} 只支持io.TextIOWrapper, io.BufferedReader')
@@ -111,7 +138,12 @@ class Session(object):
             logging.exception(ex)
             raise ValueError(f'上传body: {body} 不合法')
 
-    def _set_body(self, body):
+    def _set_body(self, body) -> None:
+        """
+        Set request body.
+        :param body: request body
+        :return: None
+        """
         if not body:
             return
         if isinstance(body, (io.TextIOWrapper, io.BufferedReader)):
@@ -123,7 +155,12 @@ class Session(object):
             logging.exception(ex)
             raise ValueError(f'body: {body} 不合法')
 
-    def _set_files(self, files):
+    def _set_files(self, files) -> None:
+        """
+        Set upload files.
+        :param files: upload files
+        :return: None
+        """
         if not files:
             return
         type_check(files, dict)
@@ -152,7 +189,14 @@ class Session(object):
             raise ex
             # raise ValueError(f'value: {value} 不合法')
 
-    def _set_timeout(self, timeout):
+    def _set_timeout(self, timeout: Optional[Union[int, float, tuple, list]]) -> None:
+        """
+        Set request timeout.
+        :param timeout:
+        :return:
+        """
+        if timeout is None:
+            return
         type_check(timeout, (int, float, tuple, list))
         # if not isinstance(timeout, (int, float, tuple, list)):
         #     raise TypeError(f'timeout: {timeout} 只支持int,float, tuple, list格式')
@@ -161,7 +205,7 @@ class Session(object):
         if isinstance(timeout, (tuple, list)):
             if len(timeout) < 2:
                 raise ValueError(f'timeout: {timeout} 应至少包含两个元素')
-            connection_timeout, download_timeout,*_ = timeout
+            connection_timeout, download_timeout, *_ = timeout
             type_check(connection_timeout, (int, float))
             type_check(download_timeout, (int, float))
             # if not all((isinstance(connection_timeout, (int, float)), isinstance(download_timeout, (int, float)))):
@@ -169,7 +213,14 @@ class Session(object):
             self.curl.setopt(pycurl.CONNECTTIMEOUT, connection_timeout)
             self.curl.setopt(pycurl.TIMEOUT, download_timeout)  # todo
 
-    def _set_allow_redirects(self, allow_redirects):
+    def _set_allow_redirects(self, allow_redirects: Optional[bool]):
+        """
+        Set request allow redirects
+        :param allow_redirects: allow_redirects if True
+        :return: None
+        """
+        if not allow_redirects:
+            return
         if allow_redirects:
             if not isinstance(allow_redirects, int):
                 allow_redirects = DEFAULT_REDIRECT_LIMIT
@@ -179,14 +230,20 @@ class Session(object):
         except Exception as ex:
             logging.error(f'设置allow_redirects {allow_redirects}失败')
 
-    def _set_verify(self, verify):
+    def _set_verify(self, verify: Optional[bool]) -> None:
+        """
+        Set if verify certificate.
+        :param verify: verify certificate if True
+        :return: None
+        """
         if verify:
             try:
                 self.curl.setopt(pycurl.CAINFO, certifi.where())
             except Exception as ex:
                 logging.error(f'设置verify {verify}失败')
 
-    def _get_clint_ip(self):
+    @staticmethod
+    def _get_client_ipv4() -> str:
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(('8.8.8.8', 80))
@@ -195,21 +252,31 @@ class Session(object):
             s.close()
         return ip
 
-    def _ping(self, domain):
+    @staticmethod
+    def _ping(domain: str) -> Optional[float]:
+        """
+        Ping a domain to get the response time.
+        :param domain: The domain to ping
+        :return: response time
+        """
         param = '-n' if platform.system().lower() == 'windows' else '-c'
         command = f'ping {param} 1 {domain}'
-        print(command)
         p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
         out = p.stdout.read().decode('utf-8')
         result, *_ = re.findall(r'time=(\d.*)\sms', out, re.M) or ['']
         if result and result.isdigit():
             return float(result)
 
-    def _set_response(self, response):
+    def _set_response(self, response: Response) -> None:
+        """
+        Set the response information
+        :param response: Response object
+        :return: None
+        """
         response.status_code = self.curl.getinfo(pycurl.HTTP_CODE)
         response.ok = 200 <= response.status_code < 400  # todo
         # response.elapsed = self.curl.getinfo(pycurl.TOTAL_TIME)
-        response.client_ip = self._get_clint_ip()  # todo
+        response.client_ip = self._get_client_ipv4()  # todo
         response.elapsed = datetime.timedelta(seconds=self.curl.getinfo(pycurl.TOTAL_TIME))
 
         response.stats['total_time'] = self.curl.getinfo(pycurl.TOTAL_TIME)
@@ -229,22 +296,34 @@ class Session(object):
         response.stats['speed_upload'] = self.curl.getinfo(pycurl.SPEED_UPLOAD)
         response.stats['speed_download'] = self.curl.getinfo(pycurl.SPEED_DOWNLOAD)
 
-    def send(self, request, timeout=None, verify=None, allow_redirects=None):
-        """负责设置pycurl并发送请求,及组装响应"""
+    def send(self, request: Request, timeout: int = None, verify: bool = None, allow_redirects: bool = None,
+             auth: Tuple[str] = None, http_version: str = None):
+        """
+        Sends a request
+        :param auth:
+        :param request:
+        :param timeout:
+        :param verify:
+        :param allow_redirects:
+        :param http_version:
+        :return:
+        """
         response = Response()
         response.request = request
         response.url = request.url
 
         self._set_method(request.method)
         self._set_url(request.url)
+        self._set_http_version(http_version)
 
-        self._set_user_agent(DEFAULT_USER_AGENT) # 设置默认User-Agent
+        self._set_user_agent(DEFAULT_USER_AGENT)  # 设置默认User-Agent
         self._set_headers(request.headers)
 
         self._set_body(request.body)
         self._set_files(request.files)
 
         self._set_timeout(timeout)
+        self._set_auth(auth)
         self._set_verify(verify)
         self._set_allow_redirects(allow_redirects)
 
@@ -257,12 +336,56 @@ class Session(object):
         self.cookies.update(response.cookies)
         return response
 
+    def _set_auth(self, auth: Optional[
+        Union[Dict[str, tuple], Tuple[str], HTTPBasicAuth, HTTPDigestAuth, HTTPNTLMAuth, OAuth1]]) -> None:
+        if not auth:
+            return
+        auth = self._format_auth(auth)
+
+        auth_type, auth_data = list(auth.items())[0]
+        if auth_type == 'basic':
+            self._set_basic_auth(*auth_data)
+        elif auth_type == 'digest':
+            self._set_digest_auth(*auth_data)
+        elif auth_type == 'ntlm':
+            self._set_ntlm_auth(*auth_data)
+        else:
+            raise NotImplementedError(f"auth type: {auth_type} is not supported")
+
+    def _format_auth(self, auth: Optional[Union[Dict[str, tuple], Tuple[str],
+    HTTPBasicAuth, HTTPDigestAuth, HTTPNTLMAuth, OAuth1]]) -> Dict[str, tuple]:
+        if isinstance(auth, dict):
+            return auth
+        if isinstance(auth, HTTPBasicAuth):
+            auth = {'basic': tuple(auth)}
+        if isinstance(auth, HTTPDigestAuth):
+            auth = {'digest': tuple(auth)}
+        elif isinstance(auth, HTTPNTLMAuth):
+            auth = {'ntlm': tuple(auth)}
+        else:
+            auth = {'basic': tuple(auth)}
+            # raise NotImplementedError(f"auth: {auth} is not supported")
+        return auth
+
+    def _set_basic_auth(self, username, password):
+        self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_BASIC)
+        self.curl.setopt(pycurl.USERPWD, '%s:%s' % (username, password))
+
+    def _set_digest_auth(self, username, password):
+        self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_DIGEST)
+        self.curl.setopt(pycurl.USERPWD, '%s:%s' % (username, password))
+
+    def _set_ntlm_auth(self, username, password):
+        self.curl.setopt(pycurl.HTTPAUTH, pycurl.HTTPAUTH_NTLM)
+        self.curl.setopt(pycurl.USERPWD, '%s:%s' % (username, password))
+
     def super_send(self, requests, config=None, times=None, concurreny=None, is_async=False, loop_until=None):
         pass
 
-
     def request(self, method=None, url=None, params=None, headers=None, cookies=None, data=None, json=None, files=None,
-                timeout=None, verify=None, allow_redirects=None, proxies=None, hooks=None, stream=None, cert=None):
+                timeout=None, verify=None, allow_redirects=None, auth: Tuple[str] = None, proxies=None, hooks=None,
+                stream=None, cert=None,
+                http_version: str = None) -> Response:
         """负责整合session和参数中的设置"""
         if self.base_url and not url.startswith('http'):
             url = '/'.join((self.base_url.rstrip('/'), url.lstrip('/')))
@@ -277,27 +400,153 @@ class Session(object):
         verify = verify if verify is not None else self.verify
         allow_redirects = verify if allow_redirects is not None else self.allow_redirects
 
-        res = self.send(request, timeout, verify, allow_redirects)
+        res = self.send(request, timeout, verify, allow_redirects, auth=auth, http_version=http_version)
         return res
 
     # todo 简化
-    def get(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('GET', url, params, headers, cookies, data, json, files, timeout, verify)
+    def get(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+            data: Union[dict, str, bytes] = None, json: dict = None,
+            files: dict = None, timeout: int = None, auth: tuple = None,
+            verify: bool = False, http_version: str = None) -> Response:
+        """
+        Sends a HTTP GET request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('GET', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def post(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('POST', url, params, headers, cookies, data, json, files, timeout, verify)
+    def post(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+             data: Union[dict, str, bytes] = None, json: dict = None,
+             files: dict = None, timeout: int = None, auth: tuple = None,
+             verify: bool = False, http_version: str = None) -> Response:
+        """
+        Sends a HTTP POST request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('POST', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def head(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('HEAD', url, params, headers, cookies, data, json, files, timeout, verify)
+    def head(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+             data: Union[dict, str, bytes] = None, json: dict = None,
+             files: dict = None, timeout: int = None, auth: tuple = None,
+             verify: bool = False, http_version: str = None) -> Response:
+        """
+        Send a HTTP Head request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('HEAD', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def options(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('OPTIONS', url, params, headers, cookies, data, json, files, timeout, verify)
+    def options(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+                data: Union[dict, str, bytes] = None, json: dict = None,
+                files: dict = None, timeout: int = None, auth: tuple = None,
+                verify: bool = False, http_version: str = None) -> Response:
+        """
+        Send a HTTP Options request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('OPTIONS', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def put(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('PUT', url, params, headers, cookies, data, json, files, timeout, verify)
+    def put(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+            data: Union[dict, str, bytes] = None, json: dict = None,
+            files: dict = None, timeout: int = None, auth: tuple = None,
+            verify: bool = False, http_version: str = None) -> Response:
+        """
+        Send a HTTP Put request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('PUT', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def patch(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('PATCH', url, params, headers, cookies, data, json, files, timeout, verify)
+    def patch(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+              data: Union[dict, str, bytes] = None, json: dict = None,
+              files: dict = None, timeout: int = None, auth: tuple = None,
+              verify: bool = False, http_version: str = None) -> Response:
+        """
+        Send a HTTP Patch request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('PATCH', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)
 
-    def delete(self, url, params=None, headers=None, cookies=None, data=None, json=None, files=None, timeout=None, verify=False):
-        return self.request('DELETE', url, params, headers, cookies, data, json, files, timeout, verify)
+    def delete(self, url, params: dict = None, headers: dict = None, cookies: dict = None,
+               data: Union[dict, str, bytes] = None, json: dict = None,
+               files: dict = None, timeout: int = None, auth: tuple = None,
+               verify: bool = False, http_version: str = None) -> Response:
+        """
+        Send a HTTP Delete request.
+        :param url: request url
+        :param params: request params
+        :param headers: request headers
+        :param cookies: request cookies
+        :param data: request data
+        :param json: request json data
+        :param files: request files
+        :param timeout: request timeout
+        :param verify: if verify certificate
+        :param http_version: http version
+        :return: Response object
+        """
+        return self.request('DELETE', url, params, headers, cookies, data, json, files, timeout, verify,
+                            auth=auth, http_version=http_version)

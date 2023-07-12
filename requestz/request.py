@@ -1,16 +1,14 @@
-import logging
-import os
-import json as pyjson
 import io
-from typing import Mapping
-from urllib.parse import quote, urlencode, urlparse, urlunparse, urlsplit
-
-from logz import log as logging
+import json as pyjson
+from typing import Mapping, Union
+from urllib.parse import quote, urlencode, urlparse, urlunparse
 
 from requestz.utils import pack_cookies, type_check
 
+
 class Request(object):
     """处理请求参数"""
+
     def __init__(self):
         self.method = None
         self.url = None
@@ -18,8 +16,8 @@ class Request(object):
         self.files = None
         self.body = None
 
-
-    def prepare(self, method=None, url=None, headers=None,cookies=None, params=None, data=None,json=None,files=None,
+    def prepare(self, method: str = None, url: str = None, headers: dict = None, cookies: dict = None,
+                params: dict = None, data: Union[dict, str, bytes] = None, json: dict = None, files: dict = None,
                 auth=None, hooks=None):
 
         self.prepare_url(url, params)
@@ -28,10 +26,21 @@ class Request(object):
         self.prepare_method(method)  # 需要在prepare_body后面
         return self
 
-    def prepare_method(self, method):
+    def prepare_method(self, method: str) -> None:
+        """
+        Uppercase method name.
+        :param method: HTTP method
+        :return:
+        """
         self.method = method.upper() if method else 'POST' if self.body else 'GET'
 
-    def prepare_url(self, url, params):
+    def prepare_url(self, url: str, params: Union[dict, list, tuple]):
+        """
+        Handle url
+        :param url:
+        :param params:
+        :return:
+        """
         # 处理url
         type_check(url, str)
         # if not isinstance(url, str):
@@ -62,7 +71,13 @@ class Request(object):
             result[4] = '&'.join(params)
             self.url = urlunparse(result)
 
-    def prepare_headers(self, headers, cookies):
+    def prepare_headers(self, headers: Union[dict, list, tuple], cookies: Union[dict, list, tuple]):
+        """
+        Handle the request headers.
+        :param headers:
+        :param cookies:
+        :return:
+        """
         if not headers and not cookies:
             return
         type_check(headers, (dict, list, tuple))
@@ -81,13 +96,20 @@ class Request(object):
             headers['Cookie'] = cookies  # FIXME 只支持headers为字典格式
 
         if isinstance(headers, Mapping):
-
             headers = headers.items()
 
         self.headers = [': '.join(item) for item in headers]  # todo
 
-
-    def prepare_body(self, data, files, json=None):
+    def prepare_body(self, data: Union[Mapping, str, io.TextIOWrapper, io.BufferedReader],
+                     files: dict,
+                     json: Union[dict, list] = None) -> None:
+        """
+        Handler the request body.
+        :param data:
+        :param files:
+        :param json:
+        :return:
+        """
         body = None
 
         if data is not None:
@@ -98,7 +120,6 @@ class Request(object):
             if isinstance(data, (Mapping, list, tuple)):
                 self.headers.update({'Content-Type': 'application/x-www-form-urlencoded'})
                 body = urlencode(data)
-                print(body)
             else:
                 body = data
         elif files is not None:

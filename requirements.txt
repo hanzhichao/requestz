@@ -1,0 +1,9 @@
+pycurl
+chardet
+certifi
+
+oauthlib
+pyyaml
+jsonschema
+jsonpath
+lxml

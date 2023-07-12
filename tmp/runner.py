@@ -1,15 +1,15 @@
-import sys; sys.path.append('/Users/apple/Documents/Projects/Self/PyPi/requestz/')
 import logging
 import os
 import unittest
-from string import Template
 from collections import ChainMap
+from string import Template
 
 import yaml
-from logz import log as logging
 
 from requestz.session import Session
 from requestz.utils import type_check
+
+# from logz import log as logging
 
 print = logging.info
 
@@ -154,14 +154,6 @@ class Runner(object):
             runner = unittest.TextTestRunner(verbosity=2)
             result = runner.run(suite)
             return result
-
-
-if __name__ == '__main__':
-    from filez import file
-    data = file.load('/Users/apple/Documents/Projects/Self/PyPi/requestz/tests/data/testsuite.yaml')
-    result = Runner().run_by_unittest(data)
-    print(result)
-
 
 
 

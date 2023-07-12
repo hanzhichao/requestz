@@ -1,0 +1,14 @@
+pycurl
+chardet
+certifi
+
+oauthlib
+pyyaml
+jsonschema
+jsonpath
+lxml
+
+pytest
+sphinx
+sphinx-rtd-theme
+requests

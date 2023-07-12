@@ -1,4 +1,4 @@
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 
 class DotDict(dict):
@@ -11,7 +11,7 @@ class SameKeysDict(dict):
         if len(args) > 0:
             arg1 = args[0]
             if isinstance(arg1, (list, tuple)):
-                [self.__setitem__(*item)  for item in arg1 if isinstance(item, (list, tuple)) and len(item) == 2]
+                [self.__setitem__(*item) for item in arg1 if isinstance(item, (list, tuple)) and len(item) == 2]
                 return
         super().__init__(*args, **kwargs)
 

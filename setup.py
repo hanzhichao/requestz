@@ -1,8 +1,27 @@
 import os
+
 from setuptools import setup, find_packages
+
+# if platform.system() == 'Darwin':
+#     os.environ['PYCURL_SSL_LIBRARY'] = 'openssl'
+#     os.environ['LDFLAGS'] = '-L/usr/local/opt/openssl/lib'
+#     os.environ['CPPFLAGS'] = '-I/usr/local/opt/openssl/include'
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 setup_requirements = []
+install_requires = [
+    'pycurl',
+    'certifi',
+    'chardet',
+
+    'oauthlib',
+    'pyyaml',  # todo remove
+    'jsonschema',  # todo remove
+    'jsonpath',  # todo remove
+    'lxml'  # todo removec
+]
+
+__VERSION__ = '0.13'
 
 
 def read_file(filename):
@@ -12,10 +31,11 @@ def read_file(filename):
 
 
 setup(
+    name='requestz',
+    version=__VERSION__,
     author="Han Zhichao",
     author_email='superhin@126.com',
     description='Requests based on PyCurl, more duration info in response',
-    # long_description='easy log use for extra infos',
     long_description=read_file('README.md'),
     long_description_content_type="text/markdown",  # 新参数
     classifiers=[
@@ -28,11 +48,11 @@ setup(
     keywords=[
         'restful', 'requests', 'http',
     ],
-    name='requestz',
+
     packages=find_packages(include=['requestz']),
     setup_requires=setup_requirements,
     url='https://github.com/hanzhichao/requestz',
-    version='0.12',
+
     zip_safe=True,
-    install_requires=['pycurl', 'jsonschema', 'jsonpath', 'lxml']
+    install_requires=install_requires
 )

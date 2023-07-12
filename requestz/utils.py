@@ -1,12 +1,12 @@
-import re
+import base64
 import logging
-from typing import Mapping
+import random
+import re
+import urllib
 from functools import wraps
-
-from jsonpath import jsonpath
-from jsonschema import validate
-from lxml import etree
-
+from typing import Mapping
+import hmac
+from hashlib import sha1
 
 def ensure_dict(field):
     if isinstance(field, Mapping):
@@ -23,7 +23,7 @@ def merge_dict(current, new):
     if not current:
         return new
 
-    current,new = ensure_dict(current), ensure_dict(new)
+    current, new = ensure_dict(current), ensure_dict(new)
 
     current = current.copy()
     current.update(new)
@@ -32,6 +32,8 @@ def merge_dict(current, new):
 
 
 def find_by_jsonpath(field, expr):
+    from jsonpath import jsonpath
+
     return jsonpath(field, expr)
 
 
@@ -40,6 +42,7 @@ def find_by_re(text, expr):
 
 
 def find_by_xpath(text, expr):  # html
+    from lxml import etree
     root = etree.HTML(text)
     return root.xpath(expr)  # todo text
 
@@ -49,6 +52,8 @@ def verify_by_expr(self, operator, expr, expect_value):  # expr: content.url
 
 
 def verify_by_schema(field, schema):
+    from jsonschema import validate
+
     return validate(field, schema=schema)
 
 
@@ -114,3 +119,39 @@ def params_check(*self, args=None, kwargs=None):
 def type_check(value, types):
     if not isinstance(value, types):
         raise TypeError(f'value: {value} must be in type {types}')
+
+
+def hmac_sha1(key: str, data: str)->str:
+    hmac_code = hmac.new(key.encode(), data.encode(), sha1).digest()
+    return base64.b64encode(hmac_code).decode()
+
+
+def get_random_str(n=6):
+    return ''.join(random.sample('zyxwvutsrqponmlkjihgfedcba'
+                                 'ABCDEFGHIGKLMNOPQRSTUVWXYZ'
+                                 '0123456789', n))
+
+
+def generate_oauth_signature(http_method, url, params, consumer_secret, token_secret=None):
+    # Step 1: Sort the parameters alphabetically by encoded key
+    encoded_params = []
+    for key, value in params.items():
+        encoded_key = urllib.parse.quote(key, safe='')
+        encoded_value = urllib.parse.quote(value, safe='')
+        encoded_params.append(encoded_key + '=' + encoded_value)
+    sorted_params = '&'.join(sorted(encoded_params))
+
+    # Step 2: Concatenate the HTTP method, URL, and sorted parameters
+    base_string = http_method.upper() + '&' + urllib.parse.quote(url, safe='') + '&' + urllib.parse.quote(sorted_params, safe='')
+
+    # Step 3: Concatenate the consumer secret and token secret (if available) with &
+    key = urllib.parse.quote(consumer_secret, safe='') + '&'
+    if token_secret:
+        key += urllib.parse.quote(token_secret, safe='')
+
+    # Step 4: Generate the HMAC-SHA1 signature
+    signature = hmac.new(key.encode(), base_string.encode(), sha1)
+    signature = base64.b64encode(signature.digest()).decode()
+
+    # Step 5: Return the signature
+    return signature
